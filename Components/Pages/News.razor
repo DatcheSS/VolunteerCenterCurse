@@ -1,0 +1,114 @@
+@page "/news"
+@inject NewsService NewsSvc
+@implements IDisposable
+
+<PageTitle>Новости — ВЦ МИРЭА</PageTitle>
+
+<div class="page-header">
+    <div class="container">
+        <h1 class="page-title"><i class="bi bi-newspaper me-2"></i>Новости</h1>
+        <p class="page-subtitle">Самые важные события волонтёрского центра</p>
+    </div>
+</div>
+
+<section class="section-pad">
+    <div class="container">
+        @if (newsList.Count > 0)
+        {
+            <!-- Карусель -->
+            <div class="news-carousel">
+                <div class="news-carousel__track" style="transform: translateX(-@(currentIndex * 100)%)">
+                    @foreach (var item in newsList)
+                    {
+                        <div class="news-carousel__slide">
+                            <div class="news-slide-card">
+                                <div class="news-slide-image">
+                                    <i class="bi bi-newspaper news-placeholder-icon"></i>
+                                </div>
+                                <div class="news-slide-body">
+                                    <div class="news-slide-date">
+                                        <i class="bi bi-calendar3 me-1"></i>@item.PublishedAt.ToString("d MMMM yyyy", new System.Globalization.CultureInfo("ru-RU"))
+                                    </div>
+                                    <h2 class="news-slide-title">@item.Title</h2>
+                                    <p class="news-slide-content">@item.Content</p>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <div class="news-carousel__dots">
+                    @for (int i = 0; i < newsList.Count; i++)
+                    {
+                        var idx = i;
+                        <button class="carousel-dot @(i == currentIndex ? "active" : "")" @onclick="() => GoTo(idx)"></button>
+                    }
+                </div>
+
+                <button class="carousel-btn carousel-btn--prev" @onclick="Prev"><i class="bi bi-chevron-left"></i></button>
+                <button class="carousel-btn carousel-btn--next" @onclick="Next"><i class="bi bi-chevron-right"></i></button>
+            </div>
+
+            <!-- Список новостей -->
+            <div class="news-list mt-5">
+                <h3 class="subsection-title">Все новости</h3>
+                @foreach (var item in newsList)
+                {
+                    <div class="news-list-item">
+                        <div class="news-list-date">@item.PublishedAt.ToString("dd.MM.yyyy")</div>
+                        <div class="news-list-content">
+                            <h4 class="news-list-title">@item.Title</h4>
+                            <p class="news-list-text">@(item.Content?.Length > 150 ? item.Content[..150] + "..." : item.Content)</p>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="empty-state">
+                <i class="bi bi-newspaper"></i>
+                <p>Новостей пока нет.</p>
+            </div>
+        }
+    </div>
+</section>
+
+@code {
+    private List<VolunteerCenterCurse.Models.News> newsList = new();
+    private int currentIndex;
+    private System.Threading.Timer? _timer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        newsList = await NewsSvc.GetActiveNewsAsync();
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender && newsList.Count > 1)
+        {
+            _timer = new System.Threading.Timer(_ => InvokeAsync(() =>
+            {
+                Next();
+                StateHasChanged();
+            }), null, 5000, 5000);
+        }
+    }
+
+    private void Next()
+    {
+        if (newsList.Count == 0) return;
+        currentIndex = (currentIndex + 1) % newsList.Count;
+    }
+
+    private void Prev()
+    {
+        if (newsList.Count == 0) return;
+        currentIndex = (currentIndex - 1 + newsList.Count) % newsList.Count;
+    }
+
+    private void GoTo(int idx) => currentIndex = idx;
+
+    public void Dispose() => _timer?.Dispose();
+}

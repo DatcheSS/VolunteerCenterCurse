@@ -1,0 +1,144 @@
+@page "/expeditions"
+@inject ExpeditionService ExpSvc
+@inject AchievementService AchievementSvc
+@inject AuthService Auth
+
+<PageTitle>Экспедиции — ВЦ РТУ МИРЭА</PageTitle>
+
+<div class="page-header">
+    <div class="container">
+        <h1 class="page-title"><i class="bi bi-compass me-2"></i>Экспедиции</h1>
+        <p class="page-subtitle">Волонтёрские экспедиции по России и не только</p>
+    </div>
+</div>
+
+<section class="section-pad">
+    <div class="container">
+        @if (expeditions.Count == 0)
+        {
+            <div class="empty-state">
+                <i class="bi bi-compass"></i>
+                <p>Экспедиции не найдены.</p>
+            </div>
+        }
+        else
+        {
+            <div class="expeditions-list">
+                @foreach (var exp in expeditions)
+                {
+                    bool isRequested = requestedIds.Contains(exp.Id);
+                    bool isUpcoming = exp.StartDate > DateTime.Now;
+
+                    <div class="expedition-card">
+                        <div class="expedition-card__accent"></div>
+                        <div class="expedition-card__body">
+                            <div class="expedition-header">
+                                <div>
+                                    <h2 class="expedition-title">@exp.Title</h2>
+                                    <div class="expedition-location">
+                                        <i class="bi bi-geo-alt me-1"></i>@exp.Location
+                                    </div>
+                                </div>
+                                <div class="expedition-dates">
+                                    <div class="exp-date-from">
+                                        <span class="exp-date-label">Начало</span>
+                                        <span class="exp-date-value">@exp.StartDate.ToString("d MMM yyyy", new System.Globalization.CultureInfo("ru-RU"))</span>
+                                    </div>
+                                    <i class="bi bi-arrow-right exp-date-arrow"></i>
+                                    <div class="exp-date-to">
+                                        <span class="exp-date-label">Конец</span>
+                                        <span class="exp-date-value">@exp.EndDate.ToString("d MMM yyyy", new System.Globalization.CultureInfo("ru-RU"))</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <p class="expedition-desc">@exp.Description</p>
+
+                            <div class="expedition-details">
+                                @if (exp.Leader != null)
+                                {
+                                    <div class="exp-detail-item">
+                                        <i class="bi bi-person-badge"></i>
+                                        <div>
+                                            <span class="exp-detail-label">Руководитель</span>
+                                            <span class="exp-detail-value">@exp.Leader.FullName</span>
+                                        </div>
+                                    </div>
+                                }
+                                @if (!string.IsNullOrEmpty(exp.HousingConditions))
+                                {
+                                    <div class="exp-detail-item">
+                                        <i class="bi bi-house"></i>
+                                        <div>
+                                            <span class="exp-detail-label">Условия проживания</span>
+                                            <span class="exp-detail-value">@exp.HousingConditions</span>
+                                        </div>
+                                    </div>
+                                }
+                                <div class="exp-detail-item">
+                                    <i class="bi bi-people"></i>
+                                    <div>
+                                        <span class="exp-detail-label">Мест</span>
+                                        <span class="exp-detail-value">@exp.MaxParticipants человек</span>
+                                    </div>
+                                </div>
+                                <div class="exp-detail-item">
+                                    <i class="bi bi-clock"></i>
+                                    <div>
+                                        <span class="exp-detail-label">Продолжительность</span>
+                                        <span class="exp-detail-value">@((exp.EndDate - exp.StartDate).Days + 1) дней</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            @if (Auth.IsVolunteer && isUpcoming)
+                            {
+                                <div class="mt-3">
+                                    @if (isRequested)
+                                    {
+                                        <span class="exp-join-badge">
+                                            <i class="bi bi-check-circle-fill me-2"></i>Заявка подана — ждём подтверждения
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn-vc btn-vc-primary" @onclick="() => JoinExpedition(exp.Id)">
+                                            <i class="bi bi-person-plus me-2"></i>Хочу стать участником
+                                        </button>
+                                    }
+                                </div>
+                            }
+                            else if (!Auth.IsLoggedIn && isUpcoming)
+                            {
+                                <div class="mt-3">
+                                    <a href="/login" class="btn-vc btn-vc-outline btn-sm">
+                                        <i class="bi bi-box-arrow-in-right me-1"></i>Войдите, чтобы подать заявку
+                                    </a>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</section>
+
+@code {
+    private List<Expedition> expeditions = new();
+    private HashSet<int> requestedIds = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        expeditions = await ExpSvc.GetAllAsync();
+        if (Auth.IsVolunteer)
+            requestedIds = await ExpSvc.GetRequestedExpeditionIdsAsync(Auth.UserId);
+    }
+
+    private async Task JoinExpedition(int expeditionId)
+    {
+        await ExpSvc.RequestParticipationAsync(Auth.UserId, expeditionId);
+        requestedIds.Add(expeditionId);
+        await AchievementSvc.CheckAndAwardAsync(Auth.UserId, "volunteer", "first_expedition");
+    }
+}

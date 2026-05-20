@@ -1,0 +1,108 @@
+@page "/become-volunteer"
+@inject FormService FormSvc
+
+<PageTitle>Стать волонтёром — ВЦ МИРЭА</PageTitle>
+
+<div class="page-header">
+    <div class="container">
+        <h1 class="page-title"><i class="bi bi-person-plus me-2"></i>Стать волонтёром</h1>
+        <p class="page-subtitle">Присоединяйтесь к команде волонтёрского центра РТУ МИРЭА</p>
+    </div>
+</div>
+
+<section class="section-pad">
+    <div class="container">
+        <div class="row g-4 align-items-start">
+            <div class="col-lg-5">
+                <div class="info-card">
+                    <h3 class="info-card-title">Почему стоит стать волонтёром?</h3>
+                    <ul class="info-list">
+                        <li><i class="bi bi-check-circle-fill me-2"></i>Волонтёрская книжка и зачёт по общественной деятельности</li>
+                        <li><i class="bi bi-check-circle-fill me-2"></i>Участие в федеральных проектах и форумах</li>
+                        <li><i class="bi bi-check-circle-fill me-2"></i>Новые друзья и командный дух</li>
+                        <li><i class="bi bi-check-circle-fill me-2"></i>Экспедиции по всей России</li>
+                        <li><i class="bi bi-check-circle-fill me-2"></i>Опыт работы в НКО</li>
+                        <li><i class="bi bi-check-circle-fill me-2"></i>Личностный рост</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="col-lg-7">
+                @if (submitted)
+                {
+                    <div class="success-card">
+                        <i class="bi bi-check-circle-fill success-icon"></i>
+                        <h3>Заявка отправлена!</h3>
+                        <p>Наш куратор свяжется с вами в ближайшее время. Добро пожаловать в команду!</p>
+                        <button class="btn-vc btn-vc-primary" @onclick="() => submitted = false">Отправить ещё одну заявку</button>
+                    </div>
+                }
+                else
+                {
+                    <div class="form-card">
+                        <h3 class="form-card-title">Заполните заявку</h3>
+
+                        <EditForm Model="@model" OnValidSubmit="Submit">
+                            <DataAnnotationsValidator />
+                            <ValidationSummary class="validation-summary" />
+
+                            <div class="form-group-vc">
+                                <label class="form-label-vc">ФИО *</label>
+                                <InputText class="form-control-vc" @bind-Value="model.FullName" placeholder="Иванов Иван Иванович" />
+                                <ValidationMessage For="() => model.FullName" class="validation-msg" />
+                            </div>
+
+                            <div class="form-group-vc">
+                                <label class="form-label-vc">Номер телефона *</label>
+                                <InputText class="form-control-vc" @bind-Value="model.Phone" placeholder="+7 (900) 123-45-67" />
+                                <ValidationMessage For="() => model.Phone" class="validation-msg" />
+                            </div>
+
+                            <div class="form-group-vc">
+                                <label class="form-label-vc">Предпочтительный способ связи</label>
+                                <div class="contact-method-group">
+                                    <label class="contact-method-option @(model.ContactMethod == "Telegram" ? "active" : "")"
+                                           @onclick="SetTelegram">
+                                        <i class="bi bi-send me-1"></i>Telegram
+                                    </label>
+                                    <label class="contact-method-option @(model.ContactMethod == "VK" ? "active" : "")"
+                                           @onclick="SetVK">
+                                        <i class="bi bi-people me-1"></i>ВКонтакте
+                                    </label>
+                                    <label class="contact-method-option @(model.ContactMethod == "Телефон" ? "active" : "")"
+                                           @onclick="SetPhone">
+                                        <i class="bi bi-telephone me-1"></i>Телефон
+                                    </label>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn-vc btn-vc-primary w-100" disabled="@sending">
+                                @if (sending) { <span class="spinner-border spinner-border-sm me-2"></span> }
+                                <i class="bi bi-person-plus me-2"></i>Подать заявку
+                            </button>
+                        </EditForm>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</section>
+
+@code {
+    private VolunteerApplication model = new();
+    private bool submitted;
+    private bool sending;
+
+    private void SetTelegram() => model.ContactMethod = "Telegram";
+    private void SetVK() => model.ContactMethod = "VK";
+    private void SetPhone() => model.ContactMethod = "Телефон";
+
+    private async Task Submit()
+    {
+        sending = true;
+        await FormSvc.SubmitVolunteerApplicationAsync(model.FullName, model.Phone, model.ContactMethod);
+        submitted = true;
+        sending = false;
+        model = new();
+    }
+}

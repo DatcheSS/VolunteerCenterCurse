@@ -1,0 +1,730 @@
+@page "/account"
+@inject AuthService Auth
+@inject EventService EventSvc
+@inject ExpeditionService ExpSvc
+@inject AchievementService AchievementSvc
+@inject AppDbContext Db
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@using Microsoft.EntityFrameworkCore
+@using ClosedXML.Excel
+
+<PageTitle>Личный кабинет — ВЦ РТУ МИРЭА</PageTitle>
+
+@if (!Auth.IsLoggedIn)
+{
+    <section class="section-pad">
+        <div class="container text-center">
+            <div class="empty-state">
+                <i class="bi bi-lock"></i>
+                <p>Для просмотра личного кабинета необходимо войти в аккаунт.</p>
+                <a href="/login" class="btn-vc btn-vc-primary">Войти</a>
+            </div>
+        </div>
+    </section>
+}
+else if (Auth.IsVolunteer)
+{
+    <div class="page-header">
+        <div class="container">
+            <h1 class="page-title"><i class="bi bi-person-circle me-2"></i>Личный кабинет</h1>
+            <p class="page-subtitle">Волонтёр</p>
+        </div>
+    </div>
+
+    <section class="section-pad">
+        <div class="container">
+            <div class="row g-4">
+                <!-- Профиль -->
+                <div class="col-lg-4">
+                    <div class="profile-card">
+                        <div class="profile-avatar">
+                            @if (!string.IsNullOrEmpty(volunteer?.AvatarUrl))
+                            {
+                                <img src="@volunteer.AvatarUrl" alt="Аватар" />
+                            }
+                            else
+                            {
+                                <i class="bi bi-person-circle"></i>
+                            }
+                        </div>
+
+                        <!-- Загрузка аватара -->
+                        <div class="avatar-upload text-center mb-2">
+                            <label class="avatar-upload-label">
+                                <i class="bi bi-camera me-1"></i>Сменить фото
+                                <InputFile OnChange="HandleAvatarUpload" accept="image/*" style="display:none" />
+                            </label>
+                            @if (!string.IsNullOrEmpty(avatarError))
+                            {
+                                <div class="text-danger" style="font-size:.75rem;margin-top:.3rem;">@avatarError</div>
+                            }
+                        </div>
+
+                        <h3 class="profile-name">@volunteer?.FullName</h3>
+                        <div class="profile-role-badge">Волонтёр</div>
+
+                        @if (!editingProfile)
+                        {
+                            <div class="profile-info">
+                                @if (!string.IsNullOrEmpty(volunteer?.Phone))
+                                {
+                                    <div class="profile-info-item">
+                                        <i class="bi bi-telephone me-2"></i>@volunteer.Phone
+                                    </div>
+                                }
+                                <div class="profile-info-item">
+                                    <i class="bi bi-envelope me-2"></i>@volunteer?.Email
+                                </div>
+                                @if (volunteer?.BirthDate != null)
+                                {
+                                    <div class="profile-info-item">
+                                        <i class="bi bi-calendar me-2"></i>@volunteer.BirthDate.Value.ToString("d MMMM yyyy", new System.Globalization.CultureInfo("ru-RU"))
+                                    </div>
+                                }
+                            </div>
+
+                            @if (!string.IsNullOrEmpty(volunteer?.Description))
+                            {
+                                <div class="profile-desc">@volunteer.Description</div>
+                            }
+
+                            <button class="btn-vc btn-vc-outline w-100 mt-3" @onclick="() => editingProfile = true">
+                                <i class="bi bi-pencil me-2"></i>Редактировать профиль
+                            </button>
+                        }
+                        else
+                        {
+                            <div class="form-group-vc mt-3">
+                                <label class="form-label-vc">О себе</label>
+                                <textarea class="form-control-vc" @bind="editDescription" rows="4"></textarea>
+                            </div>
+                            <div class="d-flex gap-2 mt-2">
+                                <button class="btn-vc btn-vc-primary flex-fill" @onclick="SaveProfile">
+                                    <i class="bi bi-check me-1"></i>Сохранить
+                                </button>
+                                <button class="btn-vc btn-vc-ghost flex-fill" @onclick="() => editingProfile = false">Отмена</button>
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Куратор -->
+                    @if (curator != null)
+                    {
+                        <div class="curator-card mt-3">
+                            <h4 class="curator-card__title">Мой куратор</h4>
+                            <div class="curator-avatar small"><i class="bi bi-person-badge"></i></div>
+                            <div class="curator-name">@curator.FullName</div>
+                            <div class="curator-position">@curator.Position</div>
+                            @if (!string.IsNullOrEmpty(curator.Phone))
+                            {
+                                <div class="curator-contact"><i class="bi bi-telephone me-2"></i>@curator.Phone</div>
+                            }
+                            <div class="curator-contact"><i class="bi bi-envelope me-2"></i>@curator.Email</div>
+                        </div>
+                    }
+
+                    <!-- Достижения -->
+                    <div class="account-section mt-3">
+                        <h3 class="account-section-title">
+                            <i class="bi bi-trophy me-2"></i>Достижения
+                            <span class="count-badge">@achievements.Count</span>
+                        </h3>
+                        <div class="achievements-grid">
+                            @foreach (var def in AchievementService.AllDefinitions)
+                            {
+                                var earned = achievements.FirstOrDefault(a => a.AchievementKey == def.Key);
+                                <div class="achievement-card @(earned != null ? "earned" : "")">
+                                    <i class="bi @def.Value.Icon achievement-icon @(earned == null ? "locked" : "")"></i>
+                                    <div class="achievement-title">@def.Value.Title</div>
+                                    <div class="achievement-desc">@def.Value.Description</div>
+                                    @if (earned != null)
+                                    {
+                                        <div class="achievement-date">@earned.EarnedAt.ToLocalTime().ToString("d MMM yyyy", new System.Globalization.CultureInfo("ru-RU"))</div>
+                                    }
+                                    else
+                                    {
+                                        <div class="achievement-date" style="color:var(--vc-subtle)">Не получено</div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Мероприятия и приглашения -->
+                <div class="col-lg-8">
+                    <!-- Приглашения -->
+                    @if (invitations.Count > 0)
+                    {
+                        <div class="account-section mb-4">
+                            <h3 class="account-section-title">
+                                <i class="bi bi-envelope-open me-2"></i>Приглашения
+                                <span class="count-badge">@invitations.Count</span>
+                            </h3>
+                            @foreach (var inv in invitations)
+                            {
+                                <div class="invitation-item">
+                                    <div class="inv-info">
+                                        <div class="inv-event">@inv.Event?.Title</div>
+                                        <div class="inv-date">@inv.Event?.Date.ToString("d MMMM, HH:mm", new System.Globalization.CultureInfo("ru-RU"))</div>
+                                        <div class="inv-from">От: @inv.Curator?.FullName</div>
+                                    </div>
+                                    <button class="btn-vc btn-vc-primary btn-sm" @onclick="() => AcceptInvitation(inv.Id)">
+                                        <i class="bi bi-check-lg me-1"></i>Принять
+                                    </button>
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    <!-- Записаться на мероприятие -->
+                    <div class="account-section mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h3 class="account-section-title mb-0">
+                                <i class="bi bi-calendar-plus me-2"></i>Записаться на мероприятие
+                            </h3>
+                            <button class="btn-vc btn-vc-outline btn-sm" @onclick="() => showEventPicker = !showEventPicker">
+                                @(showEventPicker ? "Скрыть" : "Выбрать мероприятие")
+                            </button>
+                        </div>
+
+                        @if (showEventPicker)
+                        {
+                            @if (availableEvents.Count == 0)
+                            {
+                                <p class="text-muted-vc">Нет доступных мероприятий для записи.</p>
+                            }
+                            else
+                            {
+                                <div class="event-picker">
+                                    @foreach (var ev in availableEvents)
+                                    {
+                                        <div class="event-picker-item">
+                                            <div>
+                                                <div class="picker-event-title">@ev.Title</div>
+                                                <div class="picker-event-meta">@ev.Date.ToString("d MMMM, HH:mm", new System.Globalization.CultureInfo("ru-RU")) — @ev.Location</div>
+                                            </div>
+                                            @if (registeredIds.Contains(ev.Id))
+                                            {
+                                                <span class="registered-badge"><i class="bi bi-check-circle-fill me-1"></i>Записан</span>
+                                            }
+                                            else
+                                            {
+                                                <button class="btn-vc btn-vc-primary btn-sm" @onclick="() => RegisterForEvent(ev.Id)">Записаться</button>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        }
+                    </div>
+
+                    <!-- Записанные мероприятия -->
+                    <div class="account-section mb-4">
+                        <h3 class="account-section-title">
+                            <i class="bi bi-calendar-check me-2"></i>Записанные мероприятия
+                            <span class="count-badge">@registeredEvents.Count</span>
+                        </h3>
+                        @if (registeredEvents.Count == 0)
+                        {
+                            <p class="text-muted-vc">Вы ещё не записались ни на одно мероприятие.</p>
+                        }
+                        else
+                        {
+                            @foreach (var ev in registeredEvents)
+                            {
+                                <div class="account-event-item">
+                                    <div class="acc-event-info">
+                                        <div class="acc-event-title">@ev.Title</div>
+                                        <div class="acc-event-meta">
+                                            <i class="bi bi-calendar3 me-1"></i>@ev.Date.ToString("d MMMM yyyy, HH:mm", new System.Globalization.CultureInfo("ru-RU"))
+                                            <span class="ms-3"><i class="bi bi-geo-alt me-1"></i>@ev.Location</span>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex gap-2">
+                                        <a href="/events/@ev.Id" class="btn-vc btn-vc-ghost btn-sm">Подробнее</a>
+                                        <button class="btn-vc btn-sm btn-cancel-event" @onclick="() => CancelRegistration(ev.Id)"
+                                                title="Отменить запись">
+                                            <i class="bi bi-x-circle me-1"></i>Отменить
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                        }
+                    </div>
+
+                    <!-- Посещённые мероприятия -->
+                    <div class="account-section mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h3 class="account-section-title mb-0">
+                                <i class="bi bi-award me-2"></i>Посещённые мероприятия
+                                <span class="count-badge">@attendedEvents.Count</span>
+                            </h3>
+                            @if (attendedEvents.Count > 0)
+                            {
+                                <button class="btn-vc btn-vc-outline btn-sm" @onclick="ExportToExcel">
+                                    <i class="bi bi-file-earmark-excel me-1"></i>Выгрузить Excel
+                                </button>
+                            }
+                        </div>
+                        @if (attendedEvents.Count == 0)
+                        {
+                            <p class="text-muted-vc">Нет посещённых мероприятий.</p>
+                        }
+                        else
+                        {
+                            @foreach (var ev in attendedEvents)
+                            {
+                                <div class="account-event-item account-event-item--past">
+                                    <div class="acc-event-info">
+                                        <div class="acc-event-title">@ev.Title</div>
+                                        <div class="acc-event-meta">
+                                            <i class="bi bi-calendar3 me-1"></i>@ev.Date.ToString("d MMMM yyyy", new System.Globalization.CultureInfo("ru-RU"))
+                                        </div>
+                                    </div>
+                                    <span class="badge-past-event">Выполнено</span>
+                                </div>
+                            }
+                        }
+                    </div>
+
+                    <!-- Экспедиции -->
+                    <div class="account-section">
+                        <h3 class="account-section-title">
+                            <i class="bi bi-compass me-2"></i>Экспедиции
+                            <span class="count-badge">@expeditionParticipations.Count</span>
+                        </h3>
+                        @if (expeditionParticipations.Count == 0)
+                        {
+                            <p class="text-muted-vc">Вы ещё не записывались в экспедиции. <a href="/expeditions" class="link-green">Посмотреть экспедиции</a></p>
+                        }
+                        else
+                        {
+                            @foreach (var ep in expeditionParticipations)
+                            {
+                                bool past = ep.Expedition!.EndDate < DateTime.Now;
+                                <div class="expedition-account-item">
+                                    <div>
+                                        <div class="exp-acc-title">@ep.Expedition.Title</div>
+                                        <div class="exp-acc-meta">
+                                            <i class="bi bi-geo-alt me-1"></i>@ep.Expedition.Location
+                                            <span class="ms-2"><i class="bi bi-calendar3 me-1"></i>@ep.Expedition.StartDate.ToString("d MMM yyyy", new System.Globalization.CultureInfo("ru-RU"))</span>
+                                        </div>
+                                    </div>
+                                    @if (past)
+                                    {
+                                        <span class="exp-acc-status participated"><i class="bi bi-check-circle me-1"></i>Участвовал(-а)</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="exp-acc-status desired"><i class="bi bi-hourglass-split me-1"></i>Хочу участвовать</span>
+                                    }
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+}
+else if (Auth.IsCurator)
+{
+    <div class="page-header">
+        <div class="container">
+            <h1 class="page-title"><i class="bi bi-person-badge me-2"></i>Личный кабинет куратора</h1>
+            <p class="page-subtitle">@specialist?.Position</p>
+        </div>
+    </div>
+
+    <section class="section-pad">
+        <div class="container">
+            <div class="row g-4">
+                <div class="col-lg-4">
+                    <div class="profile-card">
+                        <div class="profile-avatar"><i class="bi bi-person-badge"></i></div>
+                        <h3 class="profile-name">@specialist?.FullName</h3>
+                        <div class="profile-role-badge profile-role-badge--curator">Куратор</div>
+                        <div class="profile-info">
+                            @if (!string.IsNullOrEmpty(specialist?.Phone))
+                            {
+                                <div class="profile-info-item"><i class="bi bi-telephone me-2"></i>@specialist.Phone</div>
+                            }
+                            <div class="profile-info-item"><i class="bi bi-envelope me-2"></i>@specialist?.Email</div>
+                            <div class="profile-info-item"><i class="bi bi-briefcase me-2"></i>@specialist?.Position</div>
+                        </div>
+                    </div>
+
+                    <!-- Мои волонтёры -->
+                    <div class="curator-volunteers-card mt-3">
+                        <h4 class="curator-card__title">Мои волонтёры (@myVolunteers.Count)</h4>
+                        @foreach (var v in myVolunteers)
+                        {
+                            <div class="vol-list-item">
+                                <i class="bi bi-person me-2"></i>@v.FullName
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Достижения куратора -->
+                    <div class="account-section mt-3">
+                        <h3 class="account-section-title">
+                            <i class="bi bi-trophy me-2"></i>Достижения
+                            <span class="count-badge">@achievements.Count</span>
+                        </h3>
+                        <div class="achievements-grid">
+                            @{
+                                var curatorDefs = AchievementService.AllDefinitions
+                                    .Where(kv => kv.Key == "send_invite");
+                            }
+                            @foreach (var def in curatorDefs)
+                            {
+                                var earned = achievements.FirstOrDefault(a => a.AchievementKey == def.Key);
+                                <div class="achievement-card @(earned != null ? "earned" : "")">
+                                    <i class="bi @def.Value.Icon achievement-icon @(earned == null ? "locked" : "")"></i>
+                                    <div class="achievement-title">@def.Value.Title</div>
+                                    <div class="achievement-desc">@def.Value.Description</div>
+                                    @if (earned != null)
+                                    {
+                                        <div class="achievement-date">@earned.EarnedAt.ToLocalTime().ToString("d MMM yyyy", new System.Globalization.CultureInfo("ru-RU"))</div>
+                                    }
+                                    else
+                                    {
+                                        <div class="achievement-date" style="color:var(--vc-subtle)">Не получено</div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-8">
+                    <!-- Уведомления об отказах -->
+                    @if (curatorNotifications.Count > 0)
+                    {
+                        <div class="account-section mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h3 class="account-section-title mb-0">
+                                    <i class="bi bi-bell me-2"></i>Уведомления
+                                    <span class="count-badge">@curatorNotifications.Count</span>
+                                </h3>
+                                <button class="btn-vc btn-vc-ghost btn-sm" @onclick="MarkNotificationsRead">
+                                    Отметить прочитанными
+                                </button>
+                            </div>
+                            @foreach (var n in curatorNotifications)
+                            {
+                                <div class="notification-item">
+                                    <i class="bi bi-person-x notification-icon"></i>
+                                    <div>
+                                        <div class="notification-msg">@n.Message</div>
+                                        <div class="notification-time">@n.CreatedAt.ToLocalTime().ToString("d MMMM yyyy, HH:mm", new System.Globalization.CultureInfo("ru-RU"))</div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    <!-- Пригласить волонтёра -->
+                    <div class="account-section mb-4">
+                        <h3 class="account-section-title">
+                            <i class="bi bi-envelope-plus me-2"></i>Пригласить волонтёра на мероприятие
+                        </h3>
+
+                        @if (inviteSent)
+                        {
+                            <div class="alert-vc alert-success mb-3">
+                                <i class="bi bi-check-circle me-2"></i>Приглашение отправлено!
+                            </div>
+                        }
+                        @if (!string.IsNullOrEmpty(inviteError))
+                        {
+                            <div class="alert-vc alert-error mb-3">@inviteError</div>
+                        }
+
+                        <div class="invite-form">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label-vc">Волонтёр</label>
+                                    <select class="form-control-vc" @bind="selectedVolunteerId">
+                                        <option value="0">— Выберите волонтёра —</option>
+                                        @foreach (var v in allVolunteers)
+                                        {
+                                            <option value="@v.Id">@v.FullName</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label-vc">Мероприятие</label>
+                                    <select class="form-control-vc" @bind="selectedEventId">
+                                        <option value="0">— Выберите мероприятие —</option>
+                                        @foreach (var ev in upcomingEventsForInvite)
+                                        {
+                                            <option value="@ev.Id">@ev.Title (@ev.Date.ToString("d MMM"))</option>
+                                        }
+                                    </select>
+                                </div>
+                            </div>
+                            <button class="btn-vc btn-vc-primary mt-3" @onclick="SendInvitation">
+                                <i class="bi bi-send me-2"></i>Отправить приглашение
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Мои мероприятия -->
+                    <div class="account-section">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h3 class="account-section-title mb-0">
+                                <i class="bi bi-calendar-event me-2"></i>Мои мероприятия
+                                <span class="count-badge">@myEvents.Count</span>
+                            </h3>
+                            @if (myEvents.Count > 0)
+                            {
+                                <button class="btn-vc btn-vc-outline btn-sm" @onclick="ExportCuratorEventsToExcel">
+                                    <i class="bi bi-file-earmark-excel me-1"></i>Выгрузить Excel
+                                </button>
+                            }
+                        </div>
+                        @if (myEvents.Count == 0)
+                        {
+                            <p class="text-muted-vc">Нет назначенных мероприятий.</p>
+                        }
+                        else
+                        {
+                            @foreach (var ev in myEvents)
+                            {
+                                bool past = ev.Date < DateTime.Now;
+                                <div class="account-event-item @(past ? "account-event-item--past" : "")">
+                                    <div class="acc-event-info">
+                                        <div class="acc-event-title">@ev.Title</div>
+                                        <div class="acc-event-meta">
+                                            <i class="bi bi-calendar3 me-1"></i>@ev.Date.ToString("d MMMM yyyy, HH:mm", new System.Globalization.CultureInfo("ru-RU"))
+                                        </div>
+                                    </div>
+                                    <a href="/events/@ev.Id" class="btn-vc btn-vc-ghost btn-sm">Открыть</a>
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+}
+
+@code {
+    // Volunteer data
+    private Volunteer? volunteer;
+    private Specialist? curator;
+    private List<Event> registeredEvents = new();
+    private List<Event> attendedEvents = new();
+    private List<EventInvitation> invitations = new();
+    private List<Event> availableEvents = new();
+    private HashSet<int> registeredIds = new();
+    private List<ExpeditionParticipation> expeditionParticipations = new();
+    private List<UserAchievement> achievements = new();
+    private bool editingProfile;
+    private string editDescription = string.Empty;
+    private bool showEventPicker;
+    private string avatarError = string.Empty;
+
+    // Curator data
+    private Specialist? specialist;
+    private List<Volunteer> myVolunteers = new();
+    private List<Volunteer> allVolunteers = new();
+    private List<Event> myEvents = new();
+    private List<Event> upcomingEventsForInvite = new();
+    private List<CuratorNotification> curatorNotifications = new();
+    private int selectedVolunteerId;
+    private int selectedEventId;
+    private bool inviteSent;
+    private string? inviteError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.IsLoggedIn) return;
+
+        if (Auth.IsVolunteer)
+        {
+            volunteer = await Db.Volunteers.Include(v => v.Curator).FirstOrDefaultAsync(v => v.Id == Auth.UserId);
+            curator = volunteer?.Curator;
+            registeredEvents = await EventSvc.GetRegisteredEventsAsync(Auth.UserId);
+            attendedEvents = await EventSvc.GetAttendedEventsAsync(Auth.UserId);
+            invitations = await EventSvc.GetInvitationsAsync(Auth.UserId);
+            availableEvents = await EventSvc.GetAllUpcomingAsync();
+            registeredIds = registeredEvents.Select(e => e.Id).ToHashSet();
+            editDescription = volunteer?.Description ?? string.Empty;
+            expeditionParticipations = await ExpSvc.GetVolunteerParticipationsAsync(Auth.UserId);
+            achievements = await AchievementSvc.GetAchievementsAsync(Auth.UserId, "volunteer");
+        }
+        else if (Auth.IsCurator)
+        {
+            specialist = await Db.Specialists.FirstOrDefaultAsync(s => s.Id == Auth.UserId);
+            myVolunteers = await Db.Volunteers.Where(v => v.CuratorId == Auth.UserId).OrderBy(v => v.FullName).ToListAsync();
+            allVolunteers = await Db.Volunteers.OrderBy(v => v.FullName).ToListAsync();
+            myEvents = await Db.Events.Where(e => e.CuratorId == Auth.UserId).OrderByDescending(e => e.Date).ToListAsync();
+            upcomingEventsForInvite = await EventSvc.GetAllUpcomingAsync();
+            curatorNotifications = await EventSvc.GetCuratorNotificationsAsync(Auth.UserId);
+            achievements = await AchievementSvc.GetAchievementsAsync(Auth.UserId, "curator");
+        }
+    }
+
+    private async Task SaveProfile()
+    {
+        if (volunteer != null)
+        {
+            volunteer.Description = editDescription;
+            await Db.SaveChangesAsync();
+        }
+        editingProfile = false;
+    }
+
+    private async Task HandleAvatarUpload(InputFileChangeEventArgs e)
+    {
+        avatarError = string.Empty;
+        var file = e.File;
+        if (file.Size > 2_000_000)
+        {
+            avatarError = "Файл слишком большой. Максимум 2 МБ.";
+            return;
+        }
+        try
+        {
+            var buffer = new byte[file.Size];
+            using var stream = file.OpenReadStream(2_000_000);
+            await stream.ReadExactlyAsync(buffer);
+            var base64 = Convert.ToBase64String(buffer);
+            var dataUrl = $"data:{file.ContentType};base64,{base64}";
+            if (volunteer != null)
+            {
+                volunteer.AvatarUrl = dataUrl;
+                await Db.SaveChangesAsync();
+            }
+        }
+        catch
+        {
+            avatarError = "Не удалось загрузить файл.";
+        }
+    }
+
+    private async Task RegisterForEvent(int eventId)
+    {
+        await EventSvc.RegisterAsync(Auth.UserId, eventId);
+        registeredIds.Add(eventId);
+        registeredEvents = await EventSvc.GetRegisteredEventsAsync(Auth.UserId);
+        // Award "first_event" achievement
+        await AchievementSvc.CheckAndAwardAsync(Auth.UserId, "volunteer", "first_event");
+        achievements = await AchievementSvc.GetAchievementsAsync(Auth.UserId, "volunteer");
+    }
+
+    private async Task CancelRegistration(int eventId)
+    {
+        await EventSvc.UnregisterAsync(Auth.UserId, eventId);
+        registeredIds.Remove(eventId);
+        registeredEvents = await EventSvc.GetRegisteredEventsAsync(Auth.UserId);
+        availableEvents = await EventSvc.GetAllUpcomingAsync();
+    }
+
+    private async Task AcceptInvitation(int invId)
+    {
+        await EventSvc.AcceptInvitationAsync(invId, Auth.UserId);
+        invitations = await EventSvc.GetInvitationsAsync(Auth.UserId);
+        registeredEvents = await EventSvc.GetRegisteredEventsAsync(Auth.UserId);
+        registeredIds = registeredEvents.Select(e => e.Id).ToHashSet();
+        // Award achievements
+        await AchievementSvc.CheckAndAwardAsync(Auth.UserId, "volunteer", "accept_invite");
+        await AchievementSvc.CheckAndAwardAsync(Auth.UserId, "volunteer", "first_event");
+        achievements = await AchievementSvc.GetAchievementsAsync(Auth.UserId, "volunteer");
+    }
+
+    private async Task SendInvitation()
+    {
+        inviteSent = false;
+        inviteError = null;
+
+        if (selectedVolunteerId == 0 || selectedEventId == 0)
+        {
+            inviteError = "Выберите волонтёра и мероприятие.";
+            return;
+        }
+
+        await EventSvc.SendInvitationAsync(selectedVolunteerId, selectedEventId, Auth.UserId);
+        // Award "send_invite" achievement for curator
+        await AchievementSvc.CheckAndAwardAsync(Auth.UserId, "curator", "send_invite");
+        achievements = await AchievementSvc.GetAchievementsAsync(Auth.UserId, "curator");
+        inviteSent = true;
+        selectedVolunteerId = 0;
+        selectedEventId = 0;
+    }
+
+    private async Task MarkNotificationsRead()
+    {
+        await EventSvc.MarkNotificationsReadAsync(Auth.UserId);
+        curatorNotifications.Clear();
+    }
+
+    private async Task ExportCuratorEventsToExcel()
+    {
+        using var workbook = new XLWorkbook();
+        var ws = workbook.Worksheets.Add("Мои мероприятия");
+
+        ws.Cell(1, 1).Value = "Название мероприятия";
+        ws.Cell(1, 2).Value = "Дата";
+        ws.Cell(1, 3).Value = "Место проведения";
+        ws.Cell(1, 4).Value = "Статус";
+        var header = ws.Range("A1:D1");
+        header.Style.Font.Bold = true;
+        header.Style.Fill.BackgroundColor = XLColor.FromHtml("#2ecc71");
+        header.Style.Font.FontColor = XLColor.White;
+
+        for (int i = 0; i < myEvents.Count; i++)
+        {
+            var ev = myEvents[i];
+            ws.Cell(i + 2, 1).Value = ev.Title;
+            ws.Cell(i + 2, 2).Value = ev.Date.ToString("dd.MM.yyyy HH:mm");
+            ws.Cell(i + 2, 3).Value = ev.Location;
+            ws.Cell(i + 2, 4).Value = ev.Date < DateTime.Now ? "Прошло" : "Предстоит";
+        }
+
+        ws.Columns().AdjustToContents();
+
+        using var ms = new MemoryStream();
+        workbook.SaveAs(ms);
+        var base64 = Convert.ToBase64String(ms.ToArray());
+        var fileName = $"Мои_мероприятия_{specialist?.FullName?.Replace(' ', '_') ?? "куратор"}.xlsx";
+        await JS.InvokeVoidAsync("downloadFile", fileName, base64,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    }
+
+    private async Task ExportToExcel()
+    {
+        using var workbook = new XLWorkbook();
+        var ws = workbook.Worksheets.Add("Посещённые мероприятия");
+
+        ws.Cell(1, 1).Value = "Название мероприятия";
+        ws.Cell(1, 2).Value = "Дата";
+        ws.Cell(1, 3).Value = "Место проведения";
+        var header = ws.Range("A1:C1");
+        header.Style.Font.Bold = true;
+        header.Style.Fill.BackgroundColor = XLColor.FromHtml("#2ecc71");
+        header.Style.Font.FontColor = XLColor.White;
+
+        for (int i = 0; i < attendedEvents.Count; i++)
+        {
+            var ev = attendedEvents[i];
+            ws.Cell(i + 2, 1).Value = ev.Title;
+            ws.Cell(i + 2, 2).Value = ev.Date.ToString("dd.MM.yyyy");
+            ws.Cell(i + 2, 3).Value = ev.Location;
+        }
+
+        ws.Columns().AdjustToContents();
+
+        using var ms = new MemoryStream();
+        workbook.SaveAs(ms);
+        var base64 = Convert.ToBase64String(ms.ToArray());
+        var fileName = $"Посещённые_мероприятия_{volunteer?.FullName?.Replace(' ', '_') ?? "волонтёр"}.xlsx";
+        await JS.InvokeVoidAsync("downloadFile", fileName, base64,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    }
+}

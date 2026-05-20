@@ -1,0 +1,101 @@
+@page "/media-order"
+@inject FormService FormSvc
+@inject AuthService Auth
+@inject NavigationManager Nav
+
+<PageTitle>Заказ СМИ — ВЦ РТУ МИРЭА</PageTitle>
+
+<div class="page-header">
+    <div class="container">
+        <h1 class="page-title"><i class="bi bi-camera-video me-2"></i>Заказ СМИ</h1>
+        <p class="page-subtitle">Нужен фото- или видеограф для вашего мероприятия?</p>
+    </div>
+</div>
+
+<section class="section-pad">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-6">
+                @if (!Auth.IsLoggedIn)
+                {
+                    <div class="access-denied-card">
+                        <i class="bi bi-lock-fill access-denied-icon"></i>
+                        <h3>Требуется авторизация</h3>
+                        <p>Заказ СМИ доступен только авторизованным кураторам.</p>
+                        <a href="/login" class="btn-vc btn-vc-primary mt-2">
+                            <i class="bi bi-box-arrow-in-right me-2"></i>Войти в аккаунт
+                        </a>
+                    </div>
+                }
+                else if (!Auth.IsCurator)
+                {
+                    <div class="access-denied-card">
+                        <i class="bi bi-shield-exclamation access-denied-icon"></i>
+                        <h3>Доступ запрещён</h3>
+                        <p>Раздел «Заказ СМИ» доступен только кураторам волонтёрского центра.</p>
+                        <a href="/" class="btn-vc btn-vc-outline mt-2">
+                            <i class="bi bi-house me-2"></i>На главную
+                        </a>
+                    </div>
+                }
+                else if (submitted)
+                {
+                    <div class="success-card">
+                        <i class="bi bi-check-circle-fill success-icon"></i>
+                        <h3>Заявка отправлена!</h3>
+                        <p>Мы свяжемся с вами в ближайшее время. Спасибо за обращение!</p>
+                        <button class="btn-vc btn-vc-primary" @onclick="() => submitted = false">Отправить ещё одну заявку</button>
+                    </div>
+                }
+                else
+                {
+                    <div class="form-card">
+                        <h3 class="form-card-title">Заполните форму</h3>
+                        <p class="form-card-subtitle">Наш волонтёр-медиаспециалист приедет на ваше мероприятие</p>
+
+                        <EditForm Model="@model" OnValidSubmit="Submit">
+                            <DataAnnotationsValidator />
+                            <ValidationSummary class="validation-summary" />
+
+                            <div class="form-group-vc">
+                                <label class="form-label-vc">ФИО *</label>
+                                <InputText class="form-control-vc" @bind-Value="model.FullName" placeholder="Иванов Иван Иванович" />
+                                <ValidationMessage For="() => model.FullName" class="validation-msg" />
+                            </div>
+
+                            <div class="form-group-vc">
+                                <label class="form-label-vc">Требования к специалисту *</label>
+                                <InputTextArea class="form-control-vc" @bind-Value="model.Requirements" rows="5"
+                                              placeholder="Укажите: тип съёмки (фото/видео), дату и время мероприятия, место проведения, особые пожелания..." />
+                                <ValidationMessage For="() => model.Requirements" class="validation-msg" />
+                            </div>
+
+                            <button type="submit" class="btn-vc btn-vc-primary w-100" disabled="@sending">
+                                @if (sending)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2"></span>
+                                }
+                                <i class="bi bi-send me-2"></i>Отправить заявку
+                            </button>
+                        </EditForm>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</section>
+
+@code {
+    private VolunteerCenterCurse.Models.MediaOrder model = new();
+    private bool submitted;
+    private bool sending;
+
+    private async Task Submit()
+    {
+        sending = true;
+        await FormSvc.SubmitMediaOrderAsync(model.FullName, model.Requirements);
+        submitted = true;
+        sending = false;
+        model = new();
+    }
+}

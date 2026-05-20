@@ -1,0 +1,69 @@
+@inherits LayoutComponentBase
+@inject AuthService Auth
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+
+<div class="app-shell">
+    <NavMenu />
+
+    <main class="main-content">
+        @Body
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="footer-brand">
+                        <i class="bi bi-hearts me-2"></i>ВЦ РТУ МИРЭА
+                    </div>
+                    <p class="footer-text">
+                        Волонтёрский центр Российского технологического университета МИРЭА.
+                        Вместе делаем мир лучше с 2015 года.
+                    </p>
+                </div>
+                <div class="col-md-4">
+                    <h6 class="footer-heading">Навигация</h6>
+                    <ul class="footer-links">
+                        <li><a href="/events">Все мероприятия</a></li>
+                        <li><a href="/expeditions">Экспедиции</a></li>
+                        <li><a href="/news">Новости</a></li>
+                        <li><a href="/volunteer-school">Школа волонтёра</a></li>
+                    </ul>
+                </div>
+                <div class="col-md-4">
+                    <h6 class="footer-heading">Контакты</h6>
+                    <ul class="footer-contacts">
+                        <li><i class="bi bi-geo-alt me-2"></i>пр. Вернадского, 78, Москва</li>
+                        <li><i class="bi bi-telephone me-2"></i>+7 (958) 801-24-02</li>
+                        <li><i class="bi bi-envelope me-2"></i>volunteer@sumirea.ru</li>
+                        <li><i class="bi bi-send me-2"></i>&#64;vc_rtumirea</li>
+                    </ul>
+                </div>
+            </div>
+            <hr class="footer-divider" />
+            <p class="footer-copy">© 2026 Волонтёрский центр РТУ МИРЭА. Все права защищены.</p>
+        </div>
+    </footer>
+</div>
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !Auth.IsLoggedIn)
+        {
+            try
+            {
+                var stored = await JS.InvokeAsync<string?>("localStorage.getItem", "vc_auth");
+                if (!string.IsNullOrEmpty(stored))
+                {
+                    var parts = stored.Split('|');
+                    if (parts.Length == 3 && int.TryParse(parts[0], out var uid))
+                        Auth.Initialize(uid, parts[1], parts[2]);
+                }
+            }
+            catch { }
+            StateHasChanged();
+        }
+    }
+}

@@ -1,0 +1,17 @@
+<Router AppAssembly="typeof(App).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <PageTitle>Страница не найдена — ВЦ МИРЭА</PageTitle>
+        <LayoutView Layout="typeof(Layout.MainLayout)">
+            <div class="not-found-container">
+                <div class="not-found-icon"><i class="bi bi-exclamation-triangle"></i></div>
+                <h1>404</h1>
+                <p>Страница не найдена</p>
+                <a href="/" class="btn-vc btn-vc-primary">На главную</a>
+            </div>
+        </LayoutView>
+    </NotFound>
+</Router>

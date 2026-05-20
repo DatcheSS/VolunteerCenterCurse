@@ -1,0 +1,101 @@
+@page "/request-volunteers"
+@inject FormService FormSvc
+
+<PageTitle>Запрос волонтёров — ВЦ МИРЭА</PageTitle>
+
+<div class="page-header">
+    <div class="container">
+        <h1 class="page-title"><i class="bi bi-people me-2"></i>Запрос волонтёров</h1>
+        <p class="page-subtitle">Нужна помощь волонтёров? Оставьте заявку!</p>
+    </div>
+</div>
+
+<section class="section-pad">
+    <div class="container">
+        <div class="row g-4 align-items-start">
+            <div class="col-lg-5">
+                <div class="info-card">
+                    <h3 class="info-card-title">Как это работает?</h3>
+                    <div class="how-step">
+                        <div class="step-num">1</div>
+                        <div class="step-text">Заполните форму с описанием вашей организации и потребностей</div>
+                    </div>
+                    <div class="how-step">
+                        <div class="step-num">2</div>
+                        <div class="step-text">Куратор центра рассмотрит заявку в течение 1–2 рабочих дней</div>
+                    </div>
+                    <div class="how-step">
+                        <div class="step-num">3</div>
+                        <div class="step-text">Мы свяжемся с вами и согласуем условия помощи</div>
+                    </div>
+                    <div class="how-step">
+                        <div class="step-num">4</div>
+                        <div class="step-text">Волонтёры придут помочь в согласованное время!</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-7">
+                @if (submitted)
+                {
+                    <div class="success-card">
+                        <i class="bi bi-check-circle-fill success-icon"></i>
+                        <h3>Заявка отправлена!</h3>
+                        <p>Ваш запрос принят. Мы свяжемся с вами в ближайшее время!</p>
+                        <button class="btn-vc btn-vc-primary" @onclick="() => submitted = false">Отправить ещё одну заявку</button>
+                    </div>
+                }
+                else
+                {
+                    <div class="form-card">
+                        <h3 class="form-card-title">Заполните форму</h3>
+
+                        <EditForm Model="@model" OnValidSubmit="Submit">
+                            <DataAnnotationsValidator />
+                            <ValidationSummary class="validation-summary" />
+
+                            <div class="form-group-vc">
+                                <label class="form-label-vc">ФИО контактного лица *</label>
+                                <InputText class="form-control-vc" @bind-Value="model.FullName" placeholder="Иванов Иван Иванович" />
+                                <ValidationMessage For="() => model.FullName" class="validation-msg" />
+                            </div>
+
+                            <div class="form-group-vc">
+                                <label class="form-label-vc">Название организации *</label>
+                                <InputText class="form-control-vc" @bind-Value="model.Organization" placeholder="ООО «Пример», Детский дом №5..." />
+                                <ValidationMessage For="() => model.Organization" class="validation-msg" />
+                            </div>
+
+                            <div class="form-group-vc">
+                                <label class="form-label-vc">Описание мероприятия и запрос помощи *</label>
+                                <InputTextArea class="form-control-vc" @bind-Value="model.Description" rows="5"
+                                              placeholder="Опишите мероприятие, сколько волонтёров нужно, дату, место и вид деятельности..." />
+                                <ValidationMessage For="() => model.Description" class="validation-msg" />
+                            </div>
+
+                            <button type="submit" class="btn-vc btn-vc-primary w-100" disabled="@sending">
+                                @if (sending) { <span class="spinner-border spinner-border-sm me-2"></span> }
+                                <i class="bi bi-send me-2"></i>Отправить запрос
+                            </button>
+                        </EditForm>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</section>
+
+@code {
+    private BeneficiaryRequest model = new();
+    private bool submitted;
+    private bool sending;
+
+    private async Task Submit()
+    {
+        sending = true;
+        await FormSvc.SubmitBeneficiaryRequestAsync(model.FullName, model.Organization, model.Description);
+        submitted = true;
+        sending = false;
+        model = new();
+    }
+}

@@ -1,0 +1,157 @@
+@implements IDisposable
+@inject NavigationManager Nav
+@inject AuthService Auth
+@inject IJSRuntime JS
+
+<header class="site-header">
+    <nav class="navbar navbar-expand-lg">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="bi bi-hearts brand-icon"></i>
+                <span class="brand-name">ВЦ РТУ МИРЭА</span>
+            </a>
+
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain">
+                <i class="bi bi-list fs-4" style="color:white"></i>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navMain">
+                <ul class="navbar-nav mx-auto gap-1">
+                    <li class="nav-item">
+                        <a class="nav-link @IsActive("/events")" href="/events">Все мероприятия</a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle @IsActive("/news") @IsActive("/media-order")"
+                           href="#" role="button" data-bs-toggle="dropdown">СМИ</a>
+                        <ul class="dropdown-menu dropdown-menu-vc">
+                            <li><a class="dropdown-item" href="/news"><i class="bi bi-newspaper me-2"></i>Новости</a></li>
+                            <li><a class="dropdown-item" href="/media-order"><i class="bi bi-camera-video me-2"></i>Заказ СМИ</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link @IsActive("/expeditions")" href="/expeditions">Экспедиции</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link @IsActive("/volunteer-school")" href="/volunteer-school">Школа волонтёра</a>
+                    </li>
+                </ul>
+
+                <div class="nav-actions">
+                    <button class="nav-action-btn" @onclick="ToggleSearch" title="Поиск (Alt+F3)">
+                        <i class="bi bi-search"></i>
+                    </button>
+
+                    @if (Auth.IsLoggedIn)
+                    {
+                        <div class="dropdown">
+                            <button class="btn-vc btn-vc-outline btn-sm dropdown-toggle" data-bs-toggle="dropdown">
+                                <i class="bi bi-person-circle me-1"></i>@(Auth.UserName?.Split(' ').FirstOrDefault() ?? "Аккаунт")
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end dropdown-menu-vc">
+                                <li><a class="dropdown-item" href="/account"><i class="bi bi-person me-2"></i>Личный кабинет</a></li>
+                                <li><hr class="dropdown-divider" /></li>
+                                <li><button class="dropdown-item text-danger" @onclick="Logout"><i class="bi bi-box-arrow-right me-2"></i>Выйти</button></li>
+                            </ul>
+                        </div>
+                    }
+                    else
+                    {
+                        <a href="/login" class="btn-vc btn-vc-outline btn-sm">
+                            <i class="bi bi-box-arrow-in-right me-1"></i>Войти
+                        </a>
+                    }
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    @if (showSearch)
+    {
+        <div class="search-overlay" @onclick="CloseSearch">
+            <div class="search-inner" @onclick:stopPropagation>
+                <input @ref="searchInput" type="text" class="search-field" placeholder="Поиск на странице..."
+                       @bind="searchQuery" @onkeydown="HandleSearchKey" autofocus />
+                <button class="search-go" @onclick="DoSearch"><i class="bi bi-search"></i></button>
+                <button class="search-close" @onclick="CloseSearch"><i class="bi bi-x-lg"></i></button>
+            </div>
+            @if (!string.IsNullOrEmpty(searchResult))
+            {
+                <div class="search-result-hint">@searchResult</div>
+            }
+        </div>
+    }
+</header>
+
+@code {
+    private bool showSearch;
+    private string searchQuery = string.Empty;
+    private string searchResult = string.Empty;
+    private ElementReference searchInput;
+
+    protected override void OnInitialized()
+    {
+        Auth.OnStateChanged += HandleAuthChanged;
+    }
+
+    private void HandleAuthChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Auth.OnStateChanged -= HandleAuthChanged;
+
+    private string IsActive(string href)
+    {
+        var path = new Uri(Nav.Uri).AbsolutePath;
+        return path.StartsWith(href, StringComparison.OrdinalIgnoreCase) ? "active" : "";
+    }
+
+    private async Task ToggleSearch()
+    {
+        showSearch = !showSearch;
+        searchResult = string.Empty;
+        if (showSearch)
+        {
+            await Task.Delay(80);
+            try { await searchInput.FocusAsync(); } catch { }
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("clearSearchHighlights");
+        }
+    }
+
+    private async Task CloseSearch()
+    {
+        showSearch = false;
+        searchQuery = string.Empty;
+        searchResult = string.Empty;
+        await JS.InvokeVoidAsync("clearSearchHighlights");
+    }
+
+    private async Task HandleSearchKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await DoSearch();
+        if (e.Key == "Escape") await CloseSearch();
+    }
+
+    private async Task DoSearch()
+    {
+        if (string.IsNullOrWhiteSpace(searchQuery)) return;
+        await JS.InvokeVoidAsync("clearSearchHighlights");
+        var count = await JS.InvokeAsync<int>("searchHighlight", searchQuery.Trim());
+        searchResult = count > 0 ? $"Найдено совпадений: {count}" : "Ничего не найдено на этой странице";
+        if (count > 0)
+        {
+            await Task.Delay(1200);
+            showSearch = false;
+            searchQuery = string.Empty;
+            searchResult = string.Empty;
+            StateHasChanged();
+        }
+    }
+
+    private async Task Logout()
+    {
+        Auth.Logout();
+        await JS.InvokeVoidAsync("localStorage.removeItem", "vc_auth");
+        Nav.NavigateTo("/");
+    }
+}

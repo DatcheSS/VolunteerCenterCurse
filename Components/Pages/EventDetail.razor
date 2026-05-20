@@ -1,0 +1,145 @@
+@page "/events/{Id:int}"
+@inject EventService EventSvc
+@inject AuthService Auth
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>@(ev?.Title ?? "Мероприятие") — ВЦ МИРЭА</PageTitle>
+
+@if (ev == null)
+{
+    <div class="loading-state container mt-5">
+        <div class="spinner-border text-success" role="status"></div>
+        <p class="mt-3">Загрузка...</p>
+    </div>
+}
+else
+{
+    <div class="page-header">
+        <div class="container">
+            <a href="/events" class="back-link"><i class="bi bi-arrow-left me-2"></i>Все мероприятия</a>
+            <h1 class="page-title">@ev.Title</h1>
+            <div class="page-meta">
+                <span class="event-status-badge @(isPast ? "badge-past" : "badge-upcoming")">
+                    @(isPast ? "Прошедшее" : "Предстоящее")
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <section class="section-pad">
+        <div class="container">
+            <div class="row g-4">
+                <div class="col-lg-8">
+                    <div class="detail-card">
+                        <h3 class="detail-section-title">О мероприятии</h3>
+                        <p class="detail-desc">@ev.Description</p>
+
+                        <div class="detail-info-grid">
+                            <div class="detail-info-item">
+                                <i class="bi bi-calendar3"></i>
+                                <div>
+                                    <span class="detail-info-label">Дата и время</span>
+                                    <span class="detail-info-value">@ev.Date.ToString("d MMMM yyyy, HH:mm", new System.Globalization.CultureInfo("ru-RU"))</span>
+                                </div>
+                            </div>
+                            <div class="detail-info-item">
+                                <i class="bi bi-geo-alt"></i>
+                                <div>
+                                    <span class="detail-info-label">Место проведения</span>
+                                    <span class="detail-info-value">@ev.Location</span>
+                                </div>
+                            </div>
+                            <div class="detail-info-item">
+                                <i class="bi bi-people"></i>
+                                <div>
+                                    <span class="detail-info-label">Записалось волонтёров</span>
+                                    <span class="detail-info-value">@ev.EventRegistrations.Count чел.</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    @if (ev.Curator != null)
+                    {
+                        <div class="curator-card">
+                            <h4 class="curator-card__title">Куратор мероприятия</h4>
+                            <div class="curator-avatar"><i class="bi bi-person-circle"></i></div>
+                            <div class="curator-name">@ev.Curator.FullName</div>
+                            <div class="curator-position">@ev.Curator.Position</div>
+                            @if (!string.IsNullOrEmpty(ev.Curator.Phone))
+                            {
+                                <div class="curator-contact"><i class="bi bi-telephone me-2"></i>@ev.Curator.Phone</div>
+                            }
+                            <div class="curator-contact"><i class="bi bi-envelope me-2"></i>@ev.Curator.Email</div>
+                        </div>
+                    }
+
+                    @if (!isPast)
+                    {
+                        <div class="register-card mt-3">
+                            @if (!Auth.IsLoggedIn)
+                            {
+                                <p class="register-hint">Войдите в аккаунт, чтобы записаться на мероприятие</p>
+                                <a href="/login" class="btn-vc btn-vc-primary w-100">
+                                    <i class="bi bi-box-arrow-in-right me-2"></i>Войти
+                                </a>
+                            }
+                            else if (Auth.IsCurator)
+                            {
+                                <p class="register-hint">Кураторы не записываются как волонтёры</p>
+                            }
+                            else if (isRegistered)
+                            {
+                                <div class="register-success">
+                                    <i class="bi bi-check-circle-fill me-2"></i>Вы уже записаны!
+                                </div>
+                            }
+                            else
+                            {
+                                <button class="btn-vc btn-vc-primary w-100" @onclick="Register" disabled="@registering">
+                                    @if (registering)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2"></span>
+                                    }
+                                    <i class="bi bi-calendar-check me-2"></i>Записаться
+                                </button>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </section>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private Event? ev;
+    private bool isPast;
+    private bool isRegistered;
+    private bool registering;
+
+    protected override async Task OnInitializedAsync()
+    {
+        ev = await EventSvc.GetEventByIdAsync(Id);
+        if (ev != null)
+        {
+            isPast = ev.Date < DateTime.Now;
+            if (Auth.IsLoggedIn && Auth.IsVolunteer)
+                isRegistered = await EventSvc.IsRegisteredAsync(Auth.UserId, Id);
+        }
+    }
+
+    private async Task Register()
+    {
+        if (!Auth.IsLoggedIn) { Nav.NavigateTo("/login"); return; }
+        registering = true;
+        await EventSvc.RegisterAsync(Auth.UserId, Id);
+        isRegistered = true;
+        registering = false;
+    }
+}

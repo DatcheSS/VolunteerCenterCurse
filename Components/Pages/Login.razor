@@ -1,0 +1,96 @@
+@page "/login"
+@inject AuthService Auth
+@inject AppDbContext Db
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>Войти — ВЦ МИРЭА</PageTitle>
+
+<section class="section-pad">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-4 col-md-6">
+                <div class="login-card">
+                    <div class="login-logo">
+                        <i class="bi bi-hearts"></i>
+                    </div>
+                    <h2 class="login-title">Вход в аккаунт</h2>
+                    <p class="login-subtitle">ВЦ РТУ МИРЭА</p>
+
+                    @if (!string.IsNullOrEmpty(errorMsg))
+                    {
+                        <div class="alert-vc alert-error">
+                            <i class="bi bi-exclamation-circle me-2"></i>@errorMsg
+                        </div>
+                    }
+
+                    <EditForm Model="@loginModel" OnValidSubmit="DoLogin">
+                        <DataAnnotationsValidator />
+
+                        <div class="form-group-vc">
+                            <label class="form-label-vc">Email</label>
+                            <InputText class="form-control-vc" @bind-Value="loginModel.Email"
+                                       placeholder="your@email.ru" type="email" />
+                            <ValidationMessage For="() => loginModel.Email" class="validation-msg" />
+                        </div>
+
+                        <div class="form-group-vc">
+                            <label class="form-label-vc">Пароль</label>
+                            <InputText class="form-control-vc" @bind-Value="loginModel.Password"
+                                       placeholder="Введите пароль" type="password" />
+                            <ValidationMessage For="() => loginModel.Password" class="validation-msg" />
+                        </div>
+
+                        <button type="submit" class="btn-vc btn-vc-primary w-100 mt-2" disabled="@loading">
+                            @if (loading) { <span class="spinner-border spinner-border-sm me-2"></span> }
+                            <i class="bi bi-box-arrow-in-right me-2"></i>Войти
+                        </button>
+                    </EditForm>
+
+                    <div class="login-hint mt-4">
+                        <small class="text-muted-vc">
+                            <strong>Тестовые аккаунты:</strong><br />
+                            Волонтёр: sidorova&#64;student.mirea.ru / vol123<br />
+                            Куратор: naumov&#64;mirea.ru / curator123
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+@code {
+    private LoginModel loginModel = new();
+    private string? errorMsg;
+    private bool loading;
+
+    private async Task DoLogin()
+    {
+        loading = true;
+        errorMsg = null;
+
+        var ok = await Auth.LoginAsync(loginModel.Email, loginModel.Password, Db);
+        if (ok)
+        {
+            var stored = $"{Auth.UserId}|{Auth.UserRole}|{Auth.UserName}";
+            await JS.InvokeVoidAsync("localStorage.setItem", "vc_auth", stored);
+            Nav.NavigateTo("/account");
+        }
+        else
+        {
+            errorMsg = "Неверный email или пароль.";
+        }
+        loading = false;
+    }
+
+    private class LoginModel
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Введите email")]
+        [System.ComponentModel.DataAnnotations.EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Введите пароль")]
+        public string Password { get; set; } = string.Empty;
+    }
+}
