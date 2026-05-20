@@ -19,7 +19,6 @@ builder.Services.AddScoped<EventService>();
 builder.Services.AddScoped<ExpeditionService>();
 builder.Services.AddScoped<NewsService>();
 builder.Services.AddScoped<FormService>();
-builder.Services.AddScoped<AchievementService>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
