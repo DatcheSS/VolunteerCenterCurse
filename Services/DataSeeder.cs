@@ -33,7 +33,7 @@ public static class DataSeeder
         var vol1 = new Volunteer
         {
             FullName = "Сидорова Мария Александровна",
-            Email = "sidorova@student.mirea.ru",
+            Email = "sidorova@edu.mirea.ru",
             Phone = "+7 (800) 555-35-35",
             BirthDate = new DateTime(2005, 3, 15),
             Description = "Активный волонтёр, участвую в мероприятиях с 2023 года. Помогаю пожилым людям и детям.",
@@ -43,7 +43,7 @@ public static class DataSeeder
         var vol2 = new Volunteer
         {
             FullName = "Козлов Артём Дмитриевич",
-            Email = "kozlov@student.mirea.ru",
+            Email = "kozlov@edu.mirea.ru",
             Phone = "+7 (928) 322-53-38",
             BirthDate = new DateTime(2004, 11, 8),
             Description = "Волонтёр экологических проектов. Участвовал в трёх экспедициях.",
@@ -53,7 +53,7 @@ public static class DataSeeder
         var vol3 = new Volunteer
         {
             FullName = "Морозова Екатерина Павловна",
-            Email = "morozova@student.mirea.ru",
+            Email = "morozova@edu.mirea.ru",
             Phone = "+7 (255) 352-25-55",
             BirthDate = new DateTime(2006, 1, 22),
             Description = "Новый волонтёр. Хочу помогать людям и участвовать в городских акциях.",

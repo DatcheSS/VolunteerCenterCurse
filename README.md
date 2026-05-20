@@ -66,7 +66,7 @@ dotnet run
 
 | Роль | Email | Пароль |
 |------|-------|--------|
-| Волонтёр | sidorova@student.mirea.ru | vol123 |
+| Волонтёр | sidorova@edu.mirea.ru | vol123 |
 | Куратор | naumov@mirea.ru | curator123 |
 
 ## Запуск через Docker
